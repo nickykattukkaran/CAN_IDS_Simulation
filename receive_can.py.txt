@@ -1,0 +1,65 @@
+import argparse
+import csv
+import can
+import time  # Import the time module at the top
+
+
+
+def receive_can_messages(interface, output_csv, duration):
+    """
+    Receives CAN messages and stores them in a CSV file.
+
+    Args:
+        interface (str): CAN interface (e.g., 'can0', 'vcan0').
+        output_csv (str): Path to the output CSV file.
+        duration (int): Duration to listen for messages (in seconds).
+    """
+    print(f"Setting up CAN interface '{interface}' for receiving...")
+    try:
+        # Set up CAN bus
+        bus = can.Bus(channel=interface, interface='socketcan')
+
+        print(f"Listening for CAN messages on '{interface}' for {duration} seconds...")
+
+        # Open the CSV file for writing
+        with open(output_csv, 'w', newline='') as file:
+            writer = csv.writer(file)
+            # Write CSV header
+            writer.writerow(['ID', 'Data', 'Timestamp', 'RTR'])
+
+            # Start receiving messages
+            start_time = time.monotonic()  # Corrected to use time.monotonic()
+            while time.monotonic() - start_time < duration:
+                message = bus.recv(timeout=1)  # Receive a message with a timeout of 1 second
+                if message is not None:
+                    # Extract message details
+                    message_id = hex(message.arbitration_id)
+                    message_data = message.data.hex() if not message.is_remote_frame else ''
+                    message_timestamp = message.timestamp
+                    is_rtr = message.is_remote_frame
+
+                    # Log to CSV
+                    writer.writerow([message_id, message_data, message_timestamp, int(is_rtr)])
+                    frame_type = "RTR" if is_rtr else "DATA"
+                    print(f"Received {frame_type} Frame: ID={message_id} Data={message_data}")
+
+    except can.CanError as e:
+        print(f"CAN Error: {e}")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        print("Shutting down...")
+        bus.shutdown()
+
+
+if __name__ == "__main__":
+    # Argument parser for command-line inputs
+    parser = argparse.ArgumentParser(description="Receive CAN messages and store them in a CSV file.")
+    parser.add_argument('-i', '--interface', required=True, help="CAN interface (e.g., 'can0', 'vcan0').")
+    parser.add_argument('-o', '--output', required=True, help="Path to the output CSV file.")
+    parser.add_argument('-d', '--duration', type=int, default=10, help="Duration to listen for messages (in seconds).")
+
+    args = parser.parse_args()
+
+    # Call the function with parsed arguments
+    receive_can_messages(args.interface, args.output, args.duration)
