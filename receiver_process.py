@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from PIL import Image
 import numpy as np
-import threading
+import multiprocessing
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -140,30 +140,32 @@ def start_simulation(df, model):
 
         # Convert the numpy array to an image
         image = Image.fromarray(binary_image_data.astype(np.uint8) * 255)  # 0 = black, 1 = white
-        #image.save(os.path.join(f'{root_folder}/{output_folder}/train', f"{output_folder}_{i}.jpg"))
+
         # Create the 'temp' folder if it doesn't exist
-        os.makedirs('temp', exist_ok=True)
+        #os.makedirs('temp', exist_ok=True)
 
         # Save the image in the 'temp' folder
-        image.save(os.path.join('temp',f"image_{i}.jpg"))
+        #image.save(os.path.join('temp',f"image_{i}.jpg"))
         end_time_img = time.time()
         time_to_gen_img = (end_time_img - start_time_img)
         print(f"Time required to generate a binary iamge {time_to_gen_img:.3f} s")
-            
-        start_time_infer = time.time()
-        model.eval()
-        image = transform(image)
-        image = image.unsqueeze(0)  # Add batch dimension
-        with torch.no_grad():
-            outputs = model(image)
-            _, predicted = torch.max(outputs.data, 1)
-        print(f"The binary image Belongs to Attack Free and the model classified it as: {attack_classes[predicted.item()]}")
-        end_time_infer = time.time()
-        time_infer = (end_time_infer - start_time_infer)
-        print(f"Time required for inference : {time_infer:.3f} s")
+        #start_inference(model, image)
+        p3 = multiprocessing.Process(target=start_inference(model, image))
+        p3.start()
+        p3.join()       
 
-
-    print(f'The Images are successfully Stored in folder temp')
+def start_inference(model, image):
+    start_time_infer = time.time()
+    model.eval()
+    image = transform(image)
+    image = image.unsqueeze(0)  # Add batch dimension
+    with torch.no_grad():
+        outputs = model(image)
+        _, predicted = torch.max(outputs.data, 1)
+    print(f"The binary image Belongs to Attack Free and the model classified it as: {attack_classes[predicted.item()]}")
+    end_time_infer = time.time()
+    time_infer = (end_time_infer - start_time_infer)
+    print(f"Time required for inference : {time_infer:.3f} s")
 
 
 
@@ -234,7 +236,9 @@ def receive_can_messages(interface, output_csv, duration, model):
                         sum_msg_time = 0
                         df_temp =df
                         df = df.iloc[0:0]
-                        threading.Thread(target=start_simulation(df_temp, model)).start()            
+                        p2 = multiprocessing.Process(target=start_simulation(df_temp, model))
+                        p2.start()
+                        p2.join()           
 
     except can.CanError as e:
         print(f"CAN Error: {e}")
@@ -257,4 +261,10 @@ if __name__ == "__main__":
     testmodel = Initialize_Model()
     # Call the function with parsed arguments
     #receive_can_messages(args.interface, args.output, args.duration)
-    threading.Thread(target=receive_can_messages(args.interface, args.output, args.duration, testmodel)).start()
+    p1 = multiprocessing.Process(target=receive_can_messages(args.interface, args.output, args.duration, testmodel))
+
+    #Start the process
+    p1.start()
+
+    #wait for process to complete
+    p1.join()
