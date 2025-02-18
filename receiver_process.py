@@ -49,6 +49,7 @@ def Initialize_Model():
     # Load the saved model
     model = CNN()
     model.load_state_dict(torch.load('model.pth', weights_only=True))
+    #model.load_state_dict(torch.load('model.pth'))
     return model
 
 # Function to classify a single binary image
@@ -68,12 +69,9 @@ transform = transforms.Compose([
 ])
 
 def start_simulation(df, model):
-    # file = r"receive_message1.csv"
-    # df = load_data(file)
-    #start_time_img = time.time()
-    print("DF:")
-    print(df)
-    print("df shape: ", df.shape)
+    # print("DF:")
+    # print(df)
+    # print("df shape: ", df.shape)
 
     # Calculate the time interval between consecutive rows 
     df['TimeInterval'] = df['TimeInterval'].diff().fillna(0)
@@ -124,7 +122,7 @@ def start_simulation(df, model):
     
     #Convert to Images
     num_rows, num_cols = df.shape
-    print(num_rows, num_cols)
+    #print(num_rows, num_cols)
     num_images = num_rows // 94
 
     for i in range(num_images):
@@ -135,7 +133,10 @@ def start_simulation(df, model):
         # Reshape to 94x94
         binary_image = combined_rows.reshape(94, 1).astype(str)
         # Convert the binary strings to a numpy array of 0s and 1s
-        binary_image_data = np.array([[int(bit) for bit in row[0]] for row in binary_image])
+        #binary_image_data = np.array([[int(bit) for bit in row[0]] for row in binary_image])
+        # Convert the binary strings to a numpy array of 0s and 1s
+        binary_image_data = np.array([[int(bit) for bit in row[0].ljust(94, '0')[:94]] for row in binary_image])
+
         # print(binary_image_data)
 
         # Convert the numpy array to an image
@@ -149,7 +150,6 @@ def start_simulation(df, model):
         end_time_img = time.time()
         time_to_gen_img = (end_time_img - start_time_img)
         print(f"Time required to generate a binary iamge {time_to_gen_img:.3f} s")
-        #start_inference(model, image)
         p3 = multiprocessing.Process(target=start_inference(model, image))
         p3.start()
         p3.join()       
@@ -162,12 +162,11 @@ def start_inference(model, image):
     with torch.no_grad():
         outputs = model(image)
         _, predicted = torch.max(outputs.data, 1)
-    print(f"The binary image Belongs to Attack Free and the model classified it as: {attack_classes[predicted.item()]}")
+    #print(f"The binary image Belongs to Attack Free and the model classified it as: {attack_classes[predicted.item()]}")
     end_time_infer = time.time()
     time_infer = (end_time_infer - start_time_infer)
     print(f"Time required for inference : {time_infer:.3f} s")
-
-
+    print(f"The binary image Belongs to Attack Free and the model classified it as: {attack_classes[predicted.item()]}")
 
 def receive_can_messages(interface, output_csv, duration, model):
     """
@@ -225,13 +224,13 @@ def receive_can_messages(interface, output_csv, duration, model):
                     df = pd.concat([df, new_row], ignore_index=True)
 
                     frame_type = "RTR" if is_rtr else "DATA"
-                    print(f"Received {frame_type} Frame: ID={message_id} DLC={dlc} Data={message_data}")
+                    #print(f"Received {frame_type} Frame: ID={message_id} DLC={dlc} Data={message_data}")
                     end_time_msg = time.time()
                     sum_msg_time += (end_time_msg-start_time_msg)
 
                     if (i == 94):
                         i=0
-                        print(df)
+                        #print(df)
                         print(f"Time required to receive the 94 messages:{sum_msg_time:.3f} s")
                         sum_msg_time = 0
                         df_temp =df
@@ -247,7 +246,6 @@ def receive_can_messages(interface, output_csv, duration, model):
     finally:
         print("Shutting down...")
         bus.shutdown()
-        #start_simulation()
 
 
 if __name__ == "__main__":
@@ -260,11 +258,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     testmodel = Initialize_Model()
     # Call the function with parsed arguments
-    #receive_can_messages(args.interface, args.output, args.duration)
     p1 = multiprocessing.Process(target=receive_can_messages(args.interface, args.output, args.duration, testmodel))
-
     #Start the process
     p1.start()
-
     #wait for process to complete
     p1.join()
