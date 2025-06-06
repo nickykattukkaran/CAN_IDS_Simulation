@@ -48,7 +48,7 @@ class CNN(nn.Module):
 def Initialize_Model():
     # Load the saved model
     model = CNN()
-    model.load_state_dict(torch.load('model.pth', weights_only=True))
+    model.load_state_dict(torch.load('model5_DeepCNN.pth', weights_only=True))
     #model.load_state_dict(torch.load('model.pth'))
     return model
 
